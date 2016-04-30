@@ -52,7 +52,8 @@
     <td valign="top">
       <h2>Demonstrates:</h2>
       <ul>
-        <li>implementing drag on a tree grid</li>
+        <li>implementing expand/collapse as a filter for DataView</li>
+        <li>filter optimization on search</li>
       </ul>
     </td>
   </tr>
@@ -102,6 +103,7 @@ var TaskNameFormatter = function (row, cell, value, columnDef, dataContext) {
 
 var dataView;
 var grid;
+var moveRowsPlugin;
 var data = [];
 var columns = [
   {id: "title", name: "Title", field: "title", width: 220, cssClass: "cell-title", formatter: TaskNameFormatter, editor: Slick.Editors.Text, behavior: "selectAndMove", validator: requiredFieldValidator},
@@ -127,15 +129,12 @@ function myFilter(item) {
     return false;
   }
 
-  if (searchString != "" && item["title"].indexOf(searchString) == -1) {
-    return false;
-  }
 
   if (item.parent != null) {
     var parent = dataView.getItemById(item.parent);
 
     while (parent) {
-      if (parent._collapsed || (parent["percentComplete"] < percentCompleteThreshold) || (searchString != "" && parent["title"].indexOf(searchString) == -1)) {
+      if (parent._collapsed || (parent["percentComplete"] < percentCompleteThreshold)) {
         return false;
       }
 
@@ -143,6 +142,19 @@ function myFilter(item) {
     }
   }
 
+  if (searchString != "") {
+    var flag = false;
+    if (item["title"].indexOf(searchString) != -1) {
+      return true;
+    }
+    moveRowsPlugin.getAllChildrenItems(item, function(childrenItem) {
+      if (childrenItem["title"].indexOf(searchString) != -1) {
+        flag = true;
+        return false;
+      }
+    });
+    return flag;
+  }
   return true;
 }
 
@@ -186,7 +198,7 @@ $(function () {
 
 
   // initialize the model
-  dataView = new Slick.Data.DataView({ inlineFilters: true });
+  dataView = new Slick.Data.DataView({ inlineFilters: false });
   dataView.beginUpdate();
   dataView.setItems(data);
   dataView.setFilter(myFilter);
@@ -198,7 +210,7 @@ $(function () {
 
   grid.setSelectionModel(new Slick.RowSelectionModel());
 
-  var moveRowsPlugin = new Slick.RowMoveManager({
+  moveRowsPlugin = new Slick.RowMoveManager({
     cancelEditOnDrag: true
   });
 

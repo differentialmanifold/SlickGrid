@@ -40,17 +40,28 @@
       e.stopImmediatePropagation();
     }
 
-    function getRowsToDrag(item) {
-      var idx = dataView.getIdxById(item.id);
-      var allItems = dataView.getItems();
-      var itemsToDrag = [];
-      var idToDrag = [];
-      itemsToDrag.push(item);
-      idToDrag.push(item.id);
+    function getAllChildrenItems(item, callback) {
+      var idx = _dataView.getIdxById(item.id);
+      var allItems = _dataView.getItems();
+      var idToDrag = [item.id];
       for (; idx + 1 < allItems.length && $.inArray(allItems[idx + 1].parent, idToDrag) != -1; idx++) {
         idToDrag.push(allItems[idx + 1].id);
-        itemsToDrag.push(allItems[idx + 1]);
+        if (callback) {
+          if (callback(allItems[idx + 1]) === false) {
+            break;
+          }
+        }
       }
+      return idToDrag;
+    }
+
+    function getRowsToDrag(item) {
+      var itemsToDrag = [];
+      itemsToDrag.push(item);
+
+      getAllChildrenItems(item, function(childrenItem) {
+        itemsToDrag.push(childrenItem);
+      });
       return itemsToDrag;
     }
 
@@ -169,7 +180,8 @@
       "onMoveRows": new Slick.Event(),
 
       "init": init,
-      "destroy": destroy
+      "destroy": destroy,
+      "getAllChildrenItems": getAllChildrenItems
     });
   }
 })(jQuery);
