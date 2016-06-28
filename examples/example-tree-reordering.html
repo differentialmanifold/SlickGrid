@@ -91,6 +91,7 @@ var TaskNameFormatter = function (row, cell, value, columnDef, dataContext) {
     var spacer = "<span style='display:inline-block;height:1px;width:" + (15 * dataContext["indent"]) + "px'></span>";
     var idx = dataView.getIdxById(dataContext.id);
     if (data[idx + 1] && data[idx + 1].indent > data[idx].indent) {
+        dataContext.hasChildren = true;
         if (dataContext._collapsed) {
             return spacer + " <span class='toggle expand'></span>&nbsp;" + value;
         } else {
@@ -219,40 +220,6 @@ $(function () {
     });
 
     moveRowsPlugin.onMoveRows.subscribe(function (e, args) {
-        var rowsToDrag = args.rowsToDrag;
-        var insertBefore = args.insertBefore;
-
-        dataView.beginUpdate();
-        var i;
-        for(i = 0;i<rowsToDrag.length;i++){
-            dataView.deleteItem(rowsToDrag[i].id);
-        }
-
-        var itemAfter = dataView.getItem(insertBefore);
-
-        var itemBefore;
-        if(insertBefore === 0){
-            itemBefore = {indent:0,parent:null};
-        }else{
-            itemBefore = dataView.getItem(insertBefore-1);
-        }
-        var idx = dataView.getIdxById(itemAfter.id);
-        var len,parentId;
-        if(itemAfter.indent<=itemBefore.indent){
-            len = itemBefore.indent - rowsToDrag[0].indent;
-            parentId = itemBefore.parent;
-        }else{
-            len = itemBefore.indent + 1 - rowsToDrag[0].indent;
-            parentId = itemBefore.id;
-        }
-
-        rowsToDrag[0].parent = parentId;
-        for(i = 0;i<rowsToDrag.length;i++){
-            rowsToDrag[i].indent = rowsToDrag[i].indent + len;
-            dataView.insertItem(idx+i,rowsToDrag[i]);
-        }
-
-        dataView.endUpdate();
     });
 
     grid.registerPlugin(moveRowsPlugin);

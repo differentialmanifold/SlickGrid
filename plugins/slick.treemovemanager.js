@@ -29,6 +29,7 @@
                 .subscribe(_grid.onDragStart, handleDragStart)
                 .subscribe(_grid.onDrag, handleDrag)
                 .subscribe(_grid.onDragEnd, handleDragEnd);
+            _dataView.syncGridSelection(_grid, false);
         }
 
         function destroy() {
@@ -65,8 +66,9 @@
             return itemsToDrag;
         }
 
-        function moveItem(targetItem, treeItem, moveType) {
-            var rowsToDrag = getRowsToDrag(treeItem);
+        function moveItem(targetItem, dragItem, moveType) {
+            var rowsToDrag = getRowsToDrag(dragItem);
+            var targetRows = getRowsToDrag(targetItem);
 
             _dataView.beginUpdate();
             var i;
@@ -74,14 +76,26 @@
                 _dataView.deleteItem(rowsToDrag[i].id);
             }
 
-            var diff = targetItem.indent - treeItem.indent;
+            var diff = targetItem.indent - dragItem.indent;
 
             var idx = _dataView.getIdxById(targetItem.id);
 
-            treeItem.parent = targetItem.parent;
+            var positionToInsert;
+            if (moveType === 'prev') {
+                positionToInsert = idx;
+                dragItem.parent = targetItem.parent;
+            } else if (moveType === 'inner') {
+                positionToInsert = idx + targetRows.length;
+                diff = diff + 1;
+                dragItem.parent = targetItem.id;
+            } else if (moveType === 'next') {
+                positionToInsert = idx + targetRows.length;
+                dragItem.parent = targetItem.parent;
+            }
+
             for (i = 0; i < rowsToDrag.length; i++) {
                 rowsToDrag[i].indent = rowsToDrag[i].indent + diff;
-                _dataView.insertItem(idx + i, rowsToDrag[i]);
+                _dataView.insertItem(positionToInsert + i, rowsToDrag[i]);
             }
 
             _dataView.endUpdate();
@@ -110,24 +124,25 @@
                 item._collapsed = true;
                 _dataView.updateItem(item.id, item);
             }
-            dd.rowsToDrag = getRowsToDrag(item);
 
-            var selectedRows = _grid.getSelectedRows();
+            dd.dragItem = item;
 
-            if (selectedRows.length == 0 || $.inArray(cell.row, selectedRows) == -1) {
-                selectedRows = [cell.row];
-                _grid.setSelectedRows(selectedRows);
-            }
+            // var selectedRows = _grid.getSelectedRows();
+
+            // if (selectedRows.length == 0 || $.inArray(cell.row, selectedRows) == -1) {
+            //     selectedRows = [cell.row];
+            //     _grid.setSelectedRows(selectedRows);
+            // }
+            // dd.selectedRows = selectedRows;
 
             var rowHeight = _grid.getOptions().rowHeight;
-
-            dd.selectedRows = selectedRows;
 
             dd.selectionProxy = $("<div class='slick-reorder-proxy'/>")
                 .css("position", "absolute")
                 .css("zIndex", "99999")
                 .css("width", $(_canvas).innerWidth())
-                .css("height", rowHeight * selectedRows.length)
+                // .css("height", rowHeight * selectedRows.length)
+                .css("height", rowHeight)
                 .appendTo(_canvas);
 
             dd.guide = $("<div class='slick-reorder-guide'/>")
@@ -136,8 +151,6 @@
                 .css("width", $(_canvas).innerWidth())
                 .css("top", -1000)
                 .appendTo(_canvas);
-
-            dd.insertBefore = -1;
         }
 
         function handleDrag(e, dd) {
@@ -150,22 +163,52 @@
             var top = e.pageY - $(_canvas).offset().top;
             dd.selectionProxy.css("top", top - 5);
 
-            var insertBefore = Math.max(0, Math.min(Math.round(top / _grid.getOptions().rowHeight), _grid.getDataLength()));
-            if (insertBefore !== dd.insertBefore) {
-                var eventData = {
-                    "rows": dd.selectedRows,
-                    "insertBefore": insertBefore
-                };
+            var rowHeight = _grid.getOptions().rowHeight;
 
-                if (_self.onBeforeMoveRows.notify(eventData) === false) {
+            var targetRow = Math.max(0, Math.min(Math.floor(top / rowHeight), _grid.getDataLength()));
+
+            var targetItem = _dataView.getItem(targetRow);
+
+            var remainder = Math.max(0, Math.min(top % rowHeight, rowHeight));
+
+            var moveType, rate = remainder / rowHeight;
+
+            if (rate < 0.25) {
+                moveType = 'prev';
+            } else if (rate >= 0.25 && rate < 0.75) {
+                moveType = 'inner';
+            } else {
+                moveType = 'next';
+            }
+
+            var canmove = true,
+                guideTop = -1000;
+            if (moveType === 'prev') {
+                guideTop = targetRow * rowHeight + 0.1 * rowHeight;
+            } else if (moveType === 'inner' && targetItem.hasChildren) {
+                guideTop = targetRow * rowHeight + 0.5 * rowHeight;
+            } else if (moveType === 'next') {
+                guideTop = targetRow * rowHeight + 0.9 * rowHeight - $('.slick-reorder-guide').height();
+            } else {
+                canmove = false;
+            }
+
+
+            if (targetRow !== dd.targetRow || moveType !== dd.moveType) {
+                var eventData = {
+                    // "rows": dd.selectedRows
+                };
+                if (!canmove || _self.onBeforeMoveRows.notify(eventData) === false) {
                     dd.guide.css("top", -1000);
                     dd.canMove = false;
                 } else {
-                    dd.guide.css("top", insertBefore * _grid.getOptions().rowHeight);
+                    dd.guide.css("top", guideTop);
                     dd.canMove = true;
                 }
 
-                dd.insertBefore = insertBefore;
+                dd.targetRow = targetRow;
+                dd.targetItem = targetItem;
+                dd.moveType = moveType;
             }
         }
 
@@ -179,14 +222,14 @@
 
             dd.guide.remove();
             dd.selectionProxy.remove();
-
             if (dd.canMove) {
                 var eventData = {
-                    "rows": dd.selectedRows,
-                    "insertBefore": dd.insertBefore,
+                    // "rows": dd.selectedRows,
                     "rowsToDrag": dd.rowsToDrag
                 };
                 // TODO:  _grid.remapCellCssClasses ?
+
+                moveItem(dd.targetItem, dd.dragItem, dd.moveType)
                 _self.onMoveRows.notify(eventData);
             }
             if (_extend) {
