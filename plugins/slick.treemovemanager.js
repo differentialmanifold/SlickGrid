@@ -12,18 +12,38 @@
         var _canvas;
         var _dragging;
         var _extend;
+        var _id;
+        var _parentId;
+        var _indent;
         var _originItemId = null;
         var _self = this;
         var _handler = new Slick.EventHandler();
         var _defaults = {
-            cancelEditOnDrag: false
+            id: 'id',
+            parentId: 'parentId',
+            indent: 'indent',
+            cancelEditOnDrag: false,
+            prev: true,
+            inner: true,
+            next: true,
+            beforeDrag: true,
+            beforeDrop: true,
+            onDrop: null
         };
 
         function init(grid) {
             options = $.extend(true, {}, _defaults, options);
             _grid = grid;
             _dataView = dataView;
+            _id = options.id;
+            _parentId = options.parentId;
+            _indent = options.indent;
             _canvas = _grid.getCanvasNode();
+
+            if (!_dataView) {
+                throw 'this plugin must implement use dataView';
+            }
+
             _handler
                 .subscribe(_grid.onDragInit, handleDragInit)
                 .subscribe(_grid.onDragStart, handleDragStart)
@@ -41,12 +61,19 @@
             e.stopImmediatePropagation();
         }
 
+        function apply(fun, param, defaultValue) {
+            if ((typeof fun) == "function") {
+                return fun.apply(this, param ? param : []);
+            }
+            return defaultValue;
+        }
+
         function getAllChildrenItems(item, callback) {
-            var idx = _dataView.getIdxById(item.id);
+            var idx = _dataView.getIdxById(item[_id]);
             var allItems = _dataView.getItems();
-            var idToDrag = [item.id];
-            for (; idx + 1 < allItems.length && $.inArray(allItems[idx + 1].parent, idToDrag) != -1; idx++) {
-                idToDrag.push(allItems[idx + 1].id);
+            var idToDrag = [item[_id]];
+            for (; idx + 1 < allItems.length && $.inArray(allItems[idx + 1][_parentId], idToDrag) != -1; idx++) {
+                idToDrag.push(allItems[idx + 1][_id]);
                 if (callback) {
                     if (callback(allItems[idx + 1]) === false) {
                         break;
@@ -56,7 +83,7 @@
             return idToDrag;
         }
 
-        function getRowsToDrag(item) {
+        function getItemsToDrag(item) {
             var itemsToDrag = [];
             itemsToDrag.push(item);
 
@@ -67,35 +94,46 @@
         }
 
         function moveItem(targetItem, dragItem, moveType) {
-            var rowsToDrag = getRowsToDrag(dragItem);
-            var targetRows = getRowsToDrag(targetItem);
+            var dragItemList = getItemsToDrag(dragItem);
+            var targetItemList = getItemsToDrag(targetItem);
+            var dragParent = _dataView.getItemById(dragItem[_parentId]);
 
             _dataView.beginUpdate();
             var i;
-            for (i = 0; i < rowsToDrag.length; i++) {
-                _dataView.deleteItem(rowsToDrag[i].id);
+            for (i = 0; i < dragItemList.length; i++) {
+                _dataView.deleteItem(dragItemList[i][_id]);
             }
 
-            var diff = targetItem.indent - dragItem.indent;
+            var diff = targetItem[_indent] - dragItem[_indent];
 
-            var idx = _dataView.getIdxById(targetItem.id);
+            var idx = _dataView.getIdxById(targetItem[_id]);
 
             var positionToInsert;
             if (moveType === 'prev') {
                 positionToInsert = idx;
-                dragItem.parent = targetItem.parent;
+                dragItem[_parentId] = targetItem[_parentId];
             } else if (moveType === 'inner') {
-                positionToInsert = idx + targetRows.length;
+                positionToInsert = idx + targetItemList.length;
                 diff = diff + 1;
-                dragItem.parent = targetItem.id;
+                dragItem[_parentId] = targetItem[_id];
             } else if (moveType === 'next') {
-                positionToInsert = idx + targetRows.length;
-                dragItem.parent = targetItem.parent;
+                if (dragItem[_parentId] === targetItem[_id]) {
+                    positionToInsert = idx + targetItemList.length - dragItemList.length;
+                } else {
+                    positionToInsert = idx + targetItemList.length;
+                }
+                dragItem[_parentId] = targetItem[_parentId];
             }
 
-            for (i = 0; i < rowsToDrag.length; i++) {
-                rowsToDrag[i].indent = rowsToDrag[i].indent + diff;
-                _dataView.insertItem(positionToInsert + i, rowsToDrag[i]);
+            _dataView.updateItem(targetItem[_id], targetItem);
+
+            if (dragParent && dragParent[_id]) {
+                _dataView.updateItem(dragParent[_id], dragParent);
+            }
+
+            for (i = 0; i < dragItemList.length; i++) {
+                dragItemList[i][_indent] = dragItemList[i][_indent] + diff;
+                _dataView.insertItem(positionToInsert + i, dragItemList[i]);
             }
 
             _dataView.endUpdate();
@@ -112,20 +150,28 @@
                 return false;
             }
 
-            _dragging = true;
-            e.stopImmediatePropagation();
-
             var item = _dataView.getItem(cell.row);
-            if (item) {
-                if (!item._collapsed) {
-                    _extend = true;
-                    _originItemId = item.id;
-                }
-                item._collapsed = true;
-                _dataView.updateItem(item.id, item);
+            var dragItemList = getItemsToDrag(item);
+
+            if (apply(options.beforeDrag, [dragItemList], !!options.beforeDrag) === false) {
+                return false;
             }
 
             dd.dragItem = item;
+            dd.dragItemList = dragItemList;
+
+            _dragging = true;
+            e.stopImmediatePropagation();
+
+            if (item) {
+                if (!item._collapsed) {
+                    _extend = true;
+                    _originItemId = item[_id];
+                }
+                item._collapsed = true;
+                _dataView.updateItem(item[_id], item);
+            }
+
 
             // var selectedRows = _grid.getSelectedRows();
 
@@ -181,24 +227,34 @@
                 moveType = 'next';
             }
 
-            var canmove = true,
-                guideTop = -1000;
-            if (moveType === 'prev') {
-                guideTop = targetRow * rowHeight + 0.1 * rowHeight;
-            } else if (moveType === 'inner' && targetItem.hasChildren) {
-                guideTop = targetRow * rowHeight + 0.5 * rowHeight;
-            } else if (moveType === 'next') {
-                guideTop = targetRow * rowHeight + 0.9 * rowHeight - $('.slick-reorder-guide').height();
-            } else {
-                canmove = false;
-            }
 
 
             if (targetRow !== dd.targetRow || moveType !== dd.moveType) {
                 var eventData = {
                     // "rows": dd.selectedRows
                 };
-                if (!canmove || _self.onBeforeMoveRows.notify(eventData) === false) {
+
+                var canmove = true,
+                    guideTop = -1000,
+                    guideHeight = $('.slick-reorder-guide').height();
+
+                if (dd.dragItem[_id] === targetItem[_id]) {
+                    canmove = false;
+                }
+
+                if (canmove) {
+                    if (moveType === 'prev' && apply(options.prev, [dd.dragItemList, targetItem], !!options.prev) !== false) {
+                        guideTop = targetRow * rowHeight + 0.1 * rowHeight;
+                    } else if (moveType === 'inner' && dd.dragItem[_parentId] !== targetItem[_id] && apply(options.inner, [dd.dragItemList, targetItem], !!options.inner) !== false) {
+                        guideTop = targetRow * rowHeight + 0.5 * rowHeight;
+                    } else if (moveType === 'next' && apply(options.next, [dd.dragItemList, targetItem], !!options.next) !== false) {
+                        guideTop = targetRow * rowHeight + 0.9 * rowHeight - guideHeight;
+                    } else {
+                        canmove = false;
+                    }
+                }
+
+                if (!canmove || apply(options.beforeDrop, [dd.dragItemList, targetItem, moveType], !!options.beforeDrop) === false) {
                     dd.guide.css("top", -1000);
                     dd.canMove = false;
                 } else {
@@ -225,12 +281,11 @@
             if (dd.canMove) {
                 var eventData = {
                     // "rows": dd.selectedRows,
-                    "rowsToDrag": dd.rowsToDrag
+                    "dragItemList": dd.dragItemList
                 };
-                // TODO:  _grid.remapCellCssClasses ?
 
                 moveItem(dd.targetItem, dd.dragItem, dd.moveType)
-                _self.onMoveRows.notify(eventData);
+                apply(options.onDrop, [dd.dragItemList, dd.targetItem, dd.moveType])
             }
             if (_extend) {
                 var originItem = _dataView.getItemById(_originItemId);
@@ -241,9 +296,6 @@
         }
 
         $.extend(this, {
-            "onBeforeMoveRows": new Slick.Event(),
-            "onMoveRows": new Slick.Event(),
-
             "init": init,
             "destroy": destroy,
             "getAllChildrenItems": getAllChildrenItems

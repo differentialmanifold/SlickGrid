@@ -163,6 +163,10 @@ function percentCompleteSort(a, b) {
     return a["percentComplete"] - b["percentComplete"];
 }
 
+function onDrop(dragItemList, targetItem, moveType){
+    console.log('targetId: ' + targetItem.id);
+}
+
 $(function () {
     var indent = 0;
     var parents = [];
@@ -212,14 +216,16 @@ $(function () {
     grid.setSelectionModel(new Slick.RowSelectionModel());
 
     moveRowsPlugin = new Slick.RowMoveManager({
-        cancelEditOnDrag: true
-    });
-
-    moveRowsPlugin.onBeforeMoveRows.subscribe(function (e, data) {
-        return true;
-    });
-
-    moveRowsPlugin.onMoveRows.subscribe(function (e, args) {
+        id: 'id',
+        parentId: 'parent',
+        indent: 'indent',
+        cancelEditOnDrag: true,
+        prev: true,
+        inner: true,
+        next: true,
+        beforeDrag: true,
+        beforeDrop: true,
+        onDrop: onDrop
     });
 
     grid.registerPlugin(moveRowsPlugin);
