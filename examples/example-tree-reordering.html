@@ -163,7 +163,7 @@ function percentCompleteSort(a, b) {
     return a["percentComplete"] - b["percentComplete"];
 }
 
-function onDrop(dragItemList, targetItem, moveType){
+function onDrop(dragItem, dragItemList, targetItem, moveType){
     console.log('targetId: ' + targetItem.id);
 }
 
@@ -215,7 +215,7 @@ $(function () {
 
     grid.setSelectionModel(new Slick.RowSelectionModel());
 
-    moveRowsPlugin = new Slick.RowMoveManager({
+    moveRowsPlugin = new Slick.TreeMoveManager({
         id: 'id',
         parentId: 'parent',
         indent: 'indent',

@@ -2,11 +2,11 @@
     // register namespace
     $.extend(true, window, {
         "Slick": {
-            "RowMoveManager": RowMoveManager
+            "TreeMoveManager": TreeMoveManager
         }
     });
 
-    function RowMoveManager(options) {
+    function TreeMoveManager(options) {
         var _grid;
         var _dataView;
         var _canvas;
@@ -28,6 +28,7 @@
             next: true,
             beforeDrag: true,
             beforeDrop: true,
+            onDrag: true,
             onDrop: null
         };
 
@@ -125,15 +126,16 @@
                 dragItem[_parentId] = targetItem[_parentId];
             }
 
-            _dataView.updateItem(targetItem[_id], targetItem);
-
-            if (dragParent && dragParent[_id]) {
-                _dataView.updateItem(dragParent[_id], dragParent);
-            }
-
             for (i = 0; i < dragItemList.length; i++) {
                 dragItemList[i][_indent] = dragItemList[i][_indent] + diff;
                 _dataView.insertItem(positionToInsert + i, dragItemList[i]);
+            }
+
+            _dataView.updateItem(targetItem[_id], targetItem);
+            _dataView.updateItem(dragItem[_id], dragItem);
+
+            if (dragParent && dragParent[_id]) {
+                _dataView.updateItem(dragParent[_id], dragParent);
             }
 
             _dataView.endUpdate();
@@ -153,7 +155,7 @@
             var item = _dataView.getItem(cell.row);
             var dragItemList = getItemsToDrag(item);
 
-            if (apply(options.beforeDrag, [dragItemList], !!options.beforeDrag) === false) {
+            if (apply(options.beforeDrag, [item, dragItemList], !!options.beforeDrag) === false) {
                 return false;
             }
 
@@ -230,10 +232,6 @@
 
 
             if (targetRow !== dd.targetRow || moveType !== dd.moveType) {
-                var eventData = {
-                    // "rows": dd.selectedRows
-                };
-
                 var canmove = true,
                     guideTop = -1000,
                     guideHeight = $('.slick-reorder-guide').height();
@@ -243,18 +241,18 @@
                 }
 
                 if (canmove) {
-                    if (moveType === 'prev' && apply(options.prev, [dd.dragItemList, targetItem], !!options.prev) !== false) {
+                    if (moveType === 'prev' && apply(options.prev, [dd.dragItem, dd.dragItemList, targetItem], !!options.prev) !== false) {
                         guideTop = targetRow * rowHeight + 0.1 * rowHeight;
-                    } else if (moveType === 'inner' && dd.dragItem[_parentId] !== targetItem[_id] && apply(options.inner, [dd.dragItemList, targetItem], !!options.inner) !== false) {
+                    } else if (moveType === 'inner' && dd.dragItem[_parentId] !== targetItem[_id] && apply(options.inner, [dd.dragItem, dd.dragItemList, targetItem], !!options.inner) !== false) {
                         guideTop = targetRow * rowHeight + 0.5 * rowHeight;
-                    } else if (moveType === 'next' && apply(options.next, [dd.dragItemList, targetItem], !!options.next) !== false) {
+                    } else if (moveType === 'next' && apply(options.next, [dd.dragItem, dd.dragItemList, targetItem], !!options.next) !== false) {
                         guideTop = targetRow * rowHeight + 0.9 * rowHeight - guideHeight;
                     } else {
                         canmove = false;
                     }
                 }
 
-                if (!canmove || apply(options.beforeDrop, [dd.dragItemList, targetItem, moveType], !!options.beforeDrop) === false) {
+                if (!canmove || apply(options.onDrag, [dd.dragItem, dd.dragItemList, targetItem, moveType], !!options.onDrag) === false) {
                     dd.guide.css("top", -1000);
                     dd.canMove = false;
                 } else {
@@ -278,14 +276,9 @@
 
             dd.guide.remove();
             dd.selectionProxy.remove();
-            if (dd.canMove) {
-                var eventData = {
-                    // "rows": dd.selectedRows,
-                    "dragItemList": dd.dragItemList
-                };
-
+            if (dd.canMove && apply(options.beforeDrop, [dd.dragItem, dd.dragItemList, dd.targetItem, dd.moveType], !!options.beforeDrop) !== false) {
                 moveItem(dd.targetItem, dd.dragItem, dd.moveType)
-                apply(options.onDrop, [dd.dragItemList, dd.targetItem, dd.moveType])
+                apply(options.onDrop, [dd.dragItem, dd.dragItemList, dd.targetItem, dd.moveType])
             }
             if (_extend) {
                 var originItem = _dataView.getItemById(_originItemId);
