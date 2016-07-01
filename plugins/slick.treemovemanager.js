@@ -22,6 +22,7 @@
             id: 'id',
             parentId: 'parentId',
             indent: 'indent',
+            collapsed: 'collapsed',
             cancelEditOnDrag: false,
             prev: true,
             inner: true,
@@ -35,10 +36,11 @@
         function init(grid) {
             options = $.extend(true, {}, _defaults, options);
             _grid = grid;
-            _dataView = dataView;
+            _dataView = grid.getData();
             _id = options.id;
             _parentId = options.parentId;
             _indent = options.indent;
+            _collapsed = options.collapsed;
             _canvas = _grid.getCanvasNode();
 
             if (!_dataView) {
@@ -94,6 +96,18 @@
             return itemsToDrag;
         }
 
+        function isParent(item1, item2) {
+            var parent1 = _dataView.getItemById(item1[_parentId]);
+            if (!parent1) {
+                return false;
+            }
+            if (parent1[_id] === item2[_id]) {
+                return true;
+            }
+
+            return isParent(parent1, item2);
+        }
+
         function moveItem(targetItem, dragItem, moveType) {
             var dragItemList = getItemsToDrag(dragItem);
             var targetItemList = getItemsToDrag(targetItem);
@@ -114,11 +128,15 @@
                 positionToInsert = idx;
                 dragItem[_parentId] = targetItem[_parentId];
             } else if (moveType === 'inner') {
-                positionToInsert = idx + targetItemList.length;
+                if (isParent(dragItem, targetItem)) {
+                    positionToInsert = idx + targetItemList.length - dragItemList.length;
+                } else {
+                    positionToInsert = idx + targetItemList.length;
+                }
                 diff = diff + 1;
                 dragItem[_parentId] = targetItem[_id];
             } else if (moveType === 'next') {
-                if (dragItem[_parentId] === targetItem[_id]) {
+                if (isParent(dragItem, targetItem)) {
                     positionToInsert = idx + targetItemList.length - dragItemList.length;
                 } else {
                     positionToInsert = idx + targetItemList.length;
@@ -166,11 +184,11 @@
             e.stopImmediatePropagation();
 
             if (item) {
-                if (!item._collapsed) {
+                if (!item[_collapsed]) {
                     _extend = true;
                     _originItemId = item[_id];
                 }
-                item._collapsed = true;
+                item[_collapsed] = true;
                 _dataView.updateItem(item[_id], item);
             }
 
@@ -236,7 +254,7 @@
                     guideTop = -1000,
                     guideHeight = $('.slick-reorder-guide').height();
 
-                if (dd.dragItem[_id] === targetItem[_id]) {
+                if (!targetItem || dd.dragItem[_id] === targetItem[_id]) {
                     canmove = false;
                 }
 
@@ -282,7 +300,7 @@
             }
             if (_extend) {
                 var originItem = _dataView.getItemById(_originItemId);
-                originItem._collapsed = false;
+                originItem[_collapsed] = false;
                 _dataView.updateItem(_originItemId, originItem);
                 _extend = false;
             }
