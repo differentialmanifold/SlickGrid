@@ -209,7 +209,14 @@
                 .css("width", $(_canvas).innerWidth())
                 // .css("height", rowHeight * selectedRows.length)
                 .css("height", rowHeight)
+                .css("background-color", "#cfcfcf")
+                .css("border", "1px #00B83F dotted")
+                .css("opacity", 0.8)
+                .css("filter", "alpha(opacity=80)")
                 .appendTo(_canvas);
+
+            var cellNode = _grid.getCellNode(cell.row, cell.cell);
+            dd.selectionProxy.append($(cellNode).clone());
 
             dd.guide = $("<div class='slick-reorder-guide'/>")
                 .css("position", "absolute")
@@ -227,7 +234,9 @@
             e.stopImmediatePropagation();
 
             var top = e.pageY - $(_canvas).offset().top;
+            var left = e.pageX - $(_canvas).offset().left;
             dd.selectionProxy.css("top", top - 5);
+            dd.selectionProxy.css("left", left - 5);
 
             var rowHeight = _grid.getOptions().rowHeight;
 
