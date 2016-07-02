@@ -15,6 +15,7 @@
         var _id;
         var _parentId;
         var _indent;
+        var _collapsed;
         var _originItemId = null;
         var _self = this;
         var _handler = new Slick.EventHandler();
@@ -216,7 +217,7 @@
                 .appendTo(_canvas);
 
             var cellNode = _grid.getCellNode(cell.row, cell.cell);
-            dd.selectionProxy.append($(cellNode).clone());
+            dd.selectionProxy.append($(cellNode).clone().css("background-color", "#cfcfcf"));
 
             dd.guide = $("<div class='slick-reorder-guide'/>")
                 .css("position", "absolute")
@@ -304,8 +305,8 @@
             dd.guide.remove();
             dd.selectionProxy.remove();
             if (dd.canMove && apply(options.beforeDrop, [dd.dragItem, dd.dragItemList, dd.targetItem, dd.moveType], !!options.beforeDrop) !== false) {
-                moveItem(dd.targetItem, dd.dragItem, dd.moveType)
-                apply(options.onDrop, [dd.dragItem, dd.dragItemList, dd.targetItem, dd.moveType])
+                moveItem(dd.targetItem, dd.dragItem, dd.moveType);
+                apply(options.onDrop, [dd.dragItem, dd.dragItemList, dd.targetItem, dd.moveType]);
             }
             if (_extend) {
                 var originItem = _dataView.getItemById(_originItemId);
