@@ -261,32 +261,14 @@
             }
             dd.dragItemList = dragItemList;
 
-            // var item = _dataView.getItem(cell.row);
-            // var dragItemList = getItemsToDrag(item);
-
             if (apply(options.beforeDrag, [dragItemList], !!options.beforeDrag) === false) {
                 return false;
             }
-
-            // dd.dragItem = item;
-            // dd.dragItemList = dragItemList;
 
             _dragging = true;
             e.stopImmediatePropagation();
 
             closeBeforeDrag(dragItemList);
-
-
-            // if (item) {
-            //     if (!item[_collapsed]) {
-            //         _extend = true;
-            //         _originItemId = item[_id];
-            //     }
-            //     item[_collapsed] = true;
-            //     _dataView.updateItem(item[_id], item);
-            // }
-
-
 
             var rowHeight = _grid.getOptions().rowHeight;
 
@@ -303,16 +285,20 @@
 
             var selectionLi, cellNode;
             for (var i = 0; i < selectedRows.length; i++) {
+                cellNode = _grid.getCellNode(selectedRows[i], cell.cell);
+
                 selectionLi = $("<li class='slick-reorder-li'/>")
+                    .css("width", "inherit")
+                    .css("height", $(cellNode).height())
+                    .css("line-height", $(cellNode).height() + "px")
+                    .css("position", "absolute")
+                    .css("top", rowHeight * i)
                     .appendTo(dd.selectionProxy);
 
-                cellNode = _grid.getCellNode(selectedRows[i], cell.cell);
                 $(cellNode).clone()
                     .css("background-color", "#cfcfcf")
                     .appendTo(selectionLi);
             }
-            // var cellNode = _grid.getCellNode(cell.row, cell.cell);
-            // dd.selectionProxy.append($(cellNode).clone().css("background-color", "#cfcfcf"));
 
             dd.guide = $("<div class='slick-reorder-guide'/>")
                 .css("position", "absolute")
@@ -412,12 +398,6 @@
             }
 
             openAfterDrop();
-            // if (_extend) {
-            //     var originItem = _dataView.getItemById(_originItemId);
-            //     originItem[_collapsed] = false;
-            //     _dataView.updateItem(_originItemId, originItem);
-            //     _extend = false;
-            // }
         }
 
         $.extend(this, {
